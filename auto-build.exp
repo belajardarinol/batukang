@@ -1,0 +1,39 @@
+#!/usr/bin/expect -f
+
+# Set timeout
+set timeout 300
+
+# Set environment PATH
+set env(PATH) "/opt/homebrew/bin:$env(PATH)"
+
+# Start the EAS build command
+spawn eas build --platform android --profile preview
+
+# Handle keystore generation prompt
+expect {
+    "Generate a new Android Keystore?" {
+        send "y\r"
+        exp_continue
+    }
+    "Would you like to automatically create an EAS project" {
+        send "y\r"
+        exp_continue
+    }
+    "Build completed" {
+        puts "Build completed successfully!"
+    }
+    "Build failed" {
+        puts "Build failed!"
+        exit 1
+    }
+    timeout {
+        puts "Build timed out"
+        exit 1
+    }
+    eof {
+        puts "Build process finished"
+    }
+}
+
+# Wait for any remaining output
+expect eof
