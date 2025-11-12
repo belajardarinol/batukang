@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,12 @@ import {
   TextInput,
   Image,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, Filter, MapPin, Star, SlidersHorizontal, X } from 'lucide-react-native';
 import { router } from 'expo-router';
+import { getWorkers, Worker } from '@/lib/services/workers';
 
 const filters = ['Semua', 'Terdekat', 'Rating Tinggi', 'Harga Murah'];
 
@@ -23,81 +25,6 @@ const locations = [
   'Semua Lokasi', 'Palu Barat', 'Palu Timur', 'Palu Selatan', 'Palu Utara'
 ];
 
-const workers = [
-  {
-    id: 1,
-    name: 'Pak Budi Santoso',
-    category: 'Tukang Listrik',
-    rating: 4.8,
-    reviews: 127,
-    distance: '1.2 km',
-    price: 'Rp 75.000/jam',
-    available: true,
-    location: 'Palu Barat',
-    image: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=200&h=200&dpr=2',
-  },
-  {
-    id: 2,
-    name: 'Pak Ahmad Hidayat',
-    category: 'Tukang Plumbing',
-    rating: 4.9,
-    reviews: 89,
-    distance: '0.8 km',
-    price: 'Rp 80.000/jam',
-    available: true,
-    location: 'Palu Timur',
-    image: 'https://images.pexels.com/photos/1516680/pexels-photo-1516680.jpeg?auto=compress&cs=tinysrgb&w=200&h=200&dpr=2',
-  },
-  {
-    id: 3,
-    name: 'Pak Samsul Rahman',
-    category: 'Tukang Kayu',
-    rating: 4.7,
-    reviews: 156,
-    distance: '2.1 km',
-    price: 'Rp 65.000/jam',
-    available: false,
-    location: 'Palu Selatan',
-    image: 'https://images.pexels.com/photos/1138903/pexels-photo-1138903.jpeg?auto=compress&cs=tinysrgb&w=200&h=200&dpr=2',
-  },
-  {
-    id: 4,
-    name: 'Pak Joko Widodo',
-    category: 'Tukang Cat',
-    rating: 4.6,
-    reviews: 203,
-    distance: '1.5 km',
-    price: 'Rp 70.000/jam',
-    available: true,
-    location: 'Palu Barat',
-    image: 'https://images.pexels.com/photos/1839919/pexels-photo-1839919.jpeg?auto=compress&cs=tinysrgb&w=200&h=200&dpr=2',
-  },
-  {
-    id: 5,
-    name: 'Pak Andi Firmansyah',
-    category: 'AC Service',
-    rating: 4.9,
-    reviews: 98,
-    distance: '1.8 km',
-    price: 'Rp 85.000/jam',
-    available: true,
-    location: 'Palu Utara',
-    image: 'https://images.pexels.com/photos/1024248/pexels-photo-1024248.jpeg?auto=compress&cs=tinysrgb&w=200&h=200&dpr=2',
-  },
-  {
-    id: 6,
-    name: 'Pak Dedi Kurniawan',
-    category: 'Renovasi',
-    rating: 4.5,
-    reviews: 134,
-    distance: '3.2 km',
-    price: 'Rp 90.000/jam',
-    available: true,
-    location: 'Palu Selatan',
-    image: 'https://images.pexels.com/photos/1249611/pexels-photo-1249611.jpeg?auto=compress&cs=tinysrgb&w=200&h=200&dpr=2',
-  },
-];
-
 export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('Semua');
@@ -105,8 +32,25 @@ export default function SearchScreen() {
   const [selectedCategory, setSelectedCategory] = useState('Semua Kategori');
   const [selectedLocation, setSelectedLocation] = useState('Semua Lokasi');
   const [minRating, setMinRating] = useState(0);
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const applyFilters = (workersList: typeof workers) => {
+  useEffect(() => {
+    loadWorkers();
+  }, []);
+
+  const loadWorkers = async () => {
+    try {
+      const data = await getWorkers();
+      setWorkers(data);
+    } catch (error) {
+      console.error('Error loading workers:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const applyFilters = (workersList: Worker[]) => {
     return workersList.filter(worker => {
       // Search query filter
       if (searchQuery && !worker.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
@@ -133,17 +77,17 @@ export default function SearchScreen() {
     });
   };
 
-  const sortWorkers = (workersList: typeof workers) => {
+  const sortWorkers = (workersList: Worker[]) => {
     if (activeFilter === 'Terdekat') {
-      return [...workersList].sort((a, b) => 
-        parseFloat(a.distance) - parseFloat(b.distance)
-      );
+      return [...workersList].sort((a, b) => {
+        const distA = parseFloat(a.distance || '999');
+        const distB = parseFloat(b.distance || '999');
+        return distA - distB;
+      });
     } else if (activeFilter === 'Rating Tinggi') {
       return [...workersList].sort((a, b) => b.rating - a.rating);
     } else if (activeFilter === 'Harga Murah') {
-      return [...workersList].sort((a, b) => 
-        parseInt(a.price.replace(/\D/g, '')) - parseInt(b.price.replace(/\D/g, ''))
-      );
+      return [...workersList].sort((a, b) => a.price - b.price);
     }
     return workersList;
   };
@@ -208,59 +152,70 @@ export default function SearchScreen() {
 
       {/* Results */}
       <ScrollView style={styles.resultsContainer} showsVerticalScrollIndicator={false}>
-        <Text style={styles.resultsHeader}>
-          {filteredWorkers.length} tukang ditemukan di Palu
-        </Text>
-
-        {filteredWorkers.map((worker) => (
-          <TouchableOpacity 
-            key={worker.id} 
-            style={styles.workerCard}
-            onPress={() => router.push(`/worker/${worker.id}`)}
-          >
-            <Image source={{ uri: worker.image }} style={styles.workerImage} />
-            <View style={styles.workerInfo}>
-              <View style={styles.workerHeader}>
-                <Text style={styles.workerName}>{worker.name}</Text>
-                <View style={[
-                  styles.statusBadge,
-                  { backgroundColor: worker.available ? '#10B981' : '#6B7280' }
-                ]}>
-                  <Text style={styles.statusText}>
-                    {worker.available ? 'Tersedia' : 'Sibuk'}
-                  </Text>
-                </View>
-              </View>
-              
-              <Text style={styles.workerCategory}>{worker.category}</Text>
-              
-              <View style={styles.workerMeta}>
-                <View style={styles.ratingContainer}>
-                  <Star size={14} color="#F59E0B" fill="#F59E0B" />
-                  <Text style={styles.rating}>{worker.rating}</Text>
-                  <Text style={styles.reviews}>({worker.reviews})</Text>
-                </View>
-                <View style={styles.locationContainer}>
-                  <MapPin size={12} color="#6B7280" />
-                  <Text style={styles.distance}>{worker.distance}</Text>
-                </View>
-              </View>
-              
-              <View style={styles.workerFooter}>
-                <Text style={styles.price}>{worker.price}</Text>
-                <TouchableOpacity style={styles.bookButton}>
-                  <Text style={styles.bookButtonText}>Pesan</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </TouchableOpacity>
-        ))}
-
-        {filteredWorkers.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>Tidak ada tukang ditemukan</Text>
-            <Text style={styles.emptySubtext}>Coba ubah filter pencarian Anda</Text>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#EA580C" />
           </View>
+        ) : (
+          <>
+            <Text style={styles.resultsHeader}>
+              {filteredWorkers.length} tukang ditemukan di Palu
+            </Text>
+
+            {filteredWorkers.map((worker) => (
+              <TouchableOpacity 
+                key={worker.id} 
+                style={styles.workerCard}
+                onPress={() => router.push(`/worker/${worker.id}`)}
+              >
+                <Image 
+                  source={{ uri: worker.avatar || 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=200&h=200&dpr=2' }} 
+                  style={styles.workerImage} 
+                />
+                <View style={styles.workerInfo}>
+                  <View style={styles.workerHeader}>
+                    <Text style={styles.workerName}>{worker.name}</Text>
+                    <View style={[
+                      styles.statusBadge,
+                      { backgroundColor: worker.available ? '#10B981' : '#6B7280' }
+                    ]}>
+                      <Text style={styles.statusText}>
+                        {worker.available ? 'Tersedia' : 'Sibuk'}
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  <Text style={styles.workerCategory}>{worker.category}</Text>
+                  
+                  <View style={styles.workerMeta}>
+                    <View style={styles.ratingContainer}>
+                      <Star size={14} color="#F59E0B" fill="#F59E0B" />
+                      <Text style={styles.rating}>{worker.rating.toFixed(1)}</Text>
+                      <Text style={styles.reviews}>({worker.reviews_count})</Text>
+                    </View>
+                    <View style={styles.locationContainer}>
+                      <MapPin size={12} color="#6B7280" />
+                      <Text style={styles.distance}>{worker.distance || '1.0 km'}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.workerFooter}>
+                    <Text style={styles.price}>Rp {worker.price.toLocaleString('id-ID')}/jam</Text>
+                    <TouchableOpacity style={styles.bookButton}>
+                      <Text style={styles.bookButtonText}>Pesan</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+
+            {filteredWorkers.length === 0 && !isLoading && (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>Tidak ada tukang ditemukan</Text>
+                <Text style={styles.emptySubtext}>Coba ubah filter pencarian Anda</Text>
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
 
@@ -669,5 +624,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  loadingContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

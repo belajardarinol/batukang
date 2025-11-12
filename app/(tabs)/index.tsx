@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,11 +7,13 @@ import {
   TouchableOpacity,
   Image,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, MapPin, Star, Wrench, Zap, Chrome as HomeIcon, Car, Paintbrush, Hammer } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import { getWorkers, Worker } from '@/lib/services/workers';
 
 const categories = [
   { id: 1, name: 'Listrik', icon: Zap, color: '#EA580C' },
@@ -22,39 +24,6 @@ const categories = [
   { id: 6, name: 'Kayu', icon: Hammer, color: '#0891B2' },
 ];
 
-const featuredWorkers = [
-  {
-    id: 1,
-    name: 'Pak Budi Santoso',
-    category: 'Tukang Listrik',
-    rating: 4.8,
-    reviews: 127,
-    distance: '1.2 km',
-    price: 'Rp 75.000/jam',
-    image: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=200&h=200&dpr=2',
-  },
-  {
-    id: 2,
-    name: 'Pak Ahmad Hidayat',
-    category: 'Tukang Plumbing',
-    rating: 4.9,
-    reviews: 89,
-    distance: '0.8 km',
-    price: 'Rp 80.000/jam',
-    image: 'https://images.pexels.com/photos/1516680/pexels-photo-1516680.jpeg?auto=compress&cs=tinysrgb&w=200&h=200&dpr=2',
-  },
-  {
-    id: 5,
-    name: 'Pak Andi Firmansyah',
-    category: 'AC Service',
-    rating: 4.9,
-    reviews: 98,
-    distance: '1.8 km',
-    price: 'Rp 85.000/jam',
-    image: 'https://images.pexels.com/photos/1024248/pexels-photo-1024248.jpeg?auto=compress&cs=tinysrgb&w=200&h=200&dpr=2',
-  },
-];
-
 const quickStats = [
   { label: 'Tukang Aktif', value: '500+', color: '#EA580C' },
   { label: 'Pekerjaan Selesai', value: '2.5K+', color: '#10B981' },
@@ -63,6 +32,27 @@ const quickStats = [
 
 export default function HomeScreen() {
   const { user } = useAuth();
+  const [featuredWorkers, setFeaturedWorkers] = useState<Worker[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    loadFeaturedWorkers();
+  }, []);
+
+  const loadFeaturedWorkers = async () => {
+    try {
+      const workers = await getWorkers({ available: true });
+      // Get top 3 workers by rating
+      const topWorkers = workers
+        .sort((a, b) => b.rating - a.rating)
+        .slice(0, 3);
+      setFeaturedWorkers(topWorkers);
+    } catch (error) {
+      console.error('Error loading featured workers:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getGreeting = () => {
     if (!user) return 'Selamat datang di';
@@ -148,28 +138,41 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {featuredWorkers.map((worker) => (
-            <TouchableOpacity 
-              key={worker.id} 
-              style={styles.workerCard}
-              onPress={() => router.push(`/worker/${worker.id}`)}
-            >
-              <Image source={{ uri: worker.image }} style={styles.workerImage} />
-              <View style={styles.workerInfo}>
-                <Text style={styles.workerName}>{worker.name}</Text>
-                <Text style={styles.workerCategory}>{worker.category}</Text>
-                <View style={styles.workerMeta}>
-                  <View style={styles.ratingContainer}>
-                    <Star size={14} color="#F59E0B" fill="#F59E0B" />
-                    <Text style={styles.rating}>{worker.rating}</Text>
-                    <Text style={styles.reviews}>({worker.reviews})</Text>
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#EA580C" />
+            </View>
+          ) : featuredWorkers.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Belum ada tukang tersedia</Text>
+            </View>
+          ) : (
+            featuredWorkers.map((worker) => (
+              <TouchableOpacity 
+                key={worker.id} 
+                style={styles.workerCard}
+                onPress={() => router.push(`/worker/${worker.id}`)}
+              >
+                <Image 
+                  source={{ uri: worker.avatar || 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=200&h=200&dpr=2' }} 
+                  style={styles.workerImage} 
+                />
+                <View style={styles.workerInfo}>
+                  <Text style={styles.workerName}>{worker.name}</Text>
+                  <Text style={styles.workerCategory}>{worker.category}</Text>
+                  <View style={styles.workerMeta}>
+                    <View style={styles.ratingContainer}>
+                      <Star size={14} color="#F59E0B" fill="#F59E0B" />
+                      <Text style={styles.rating}>{worker.rating.toFixed(1)}</Text>
+                      <Text style={styles.reviews}>({worker.reviews_count})</Text>
+                    </View>
+                    <Text style={styles.distance}>{worker.distance || '1.0 km'}</Text>
                   </View>
-                  <Text style={styles.distance}>{worker.distance}</Text>
+                  <Text style={styles.price}>Rp {worker.price.toLocaleString('id-ID')}/jam</Text>
                 </View>
-                <Text style={styles.price}>{worker.price}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+              </TouchableOpacity>
+            ))
+          )}
         </View>
 
         {/* Emergency Service Banner */}
@@ -511,5 +514,21 @@ const styles = StyleSheet.create({
     color: '#374151',
     lineHeight: 20,
     fontStyle: 'italic',
+  },
+  loadingContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
   },
 });

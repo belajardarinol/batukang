@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -20,51 +21,7 @@ import {
   Check,
   X
 } from 'lucide-react-native';
-
-// Mock data for worker details
-const workerData = {
-  '1': {
-    id: 1,
-    name: 'Pak Budi Santoso',
-    category: 'Tukang Listrik',
-    rating: 4.8,
-    reviews: 127,
-    distance: '1.2 km',
-    price: 75000,
-    available: true,
-    image: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&dpr=2',
-    description: 'Pengalaman 15 tahun dalam bidang instalasi listrik rumah dan komersial. Spesialisasi dalam perbaikan korsleting, pemasangan lampu, dan instalasi panel listrik.',
-    services: ['Instalasi Listrik', 'Perbaikan Korsleting', 'Pemasangan Lampu', 'Panel Listrik'],
-    workingHours: '08:00 - 17:00',
-    experience: '15 tahun',
-    completedJobs: 1247,
-    responseTime: '< 30 menit',
-    location: 'Palu Barat, Sulawesi Tengah',
-    gallery: [
-      'https://images.pexels.com/photos/257736/pexels-photo-257736.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&dpr=2',
-      'https://images.pexels.com/photos/159358/electrical-installation-electric-electricity-159358.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&dpr=2',
-      'https://images.pexels.com/photos/257761/pexels-photo-257761.jpeg?auto=compress&cs=tinysrgb&w=400&h=300&dpr=2',
-    ],
-    reviews: [
-      {
-        id: 1,
-        name: 'Ibu Sarah',
-        rating: 5,
-        comment: 'Sangat profesional dan cepat dalam menangani masalah listrik di rumah. Recommended!',
-        date: '2025-01-10',
-        avatar: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&dpr=2'
-      },
-      {
-        id: 2,
-        name: 'Pak Agus',
-        rating: 5,
-        comment: 'Harga terjangkau, hasil memuaskan. Pak Budi sangat berpengalaman.',
-        date: '2025-01-08',
-        avatar: 'https://images.pexels.com/photos/1040880/pexels-photo-1040880.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&dpr=2'
-      },
-    ]
-  }
-};
+import { getWorkerById, WorkerWithGallery } from '@/lib/services/workers';
 
 const timeSlots = [
   '08:00', '09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00'
@@ -75,9 +32,35 @@ export default function WorkerDetailScreen() {
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [worker, setWorker] = useState<WorkerWithGallery | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const worker = workerData[id as keyof typeof workerData];
+  useEffect(() => {
+    if (id) {
+      loadWorker();
+    }
+  }, [id]);
+
+  const loadWorker = async () => {
+    try {
+      const data = await getWorkerById(id as string);
+      setWorker(data);
+    } catch (error) {
+      console.error('Error loading worker:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <ActivityIndicator size="large" color="#EA580C" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!worker) {
     return (
@@ -116,7 +99,7 @@ export default function WorkerDetailScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Worker Info */}
         <View style={styles.workerSection}>
-          <Image source={{ uri: worker.image }} style={styles.workerImage} />
+          <Image source={{ uri: worker.avatar || 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=400&h=400&dpr=2' }} style={styles.workerImage} />
           <View style={styles.workerInfo}>
             <Text style={styles.workerName}>{worker.name}</Text>
             <Text style={styles.workerCategory}>{worker.category}</Text>
@@ -124,8 +107,8 @@ export default function WorkerDetailScreen() {
             <View style={styles.workerMeta}>
               <View style={styles.ratingContainer}>
                 <Star size={16} color="#F59E0B" fill="#F59E0B" />
-                <Text style={styles.rating}>{worker.rating}</Text>
-                <Text style={styles.reviews}>({worker.reviews} ulasan)</Text>
+                <Text style={styles.rating}>{worker.rating.toFixed(1)}</Text>
+                <Text style={styles.reviews}>({worker.reviews_count} ulasan)</Text>
               </View>
               <View style={styles.locationContainer}>
                 <MapPin size={14} color="#6B7280" />
@@ -151,11 +134,11 @@ export default function WorkerDetailScreen() {
             <Text style={styles.statLabel}>Pengalaman</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{worker.completedJobs}+</Text>
+            <Text style={styles.statValue}>{worker.completed_jobs}+</Text>
             <Text style={styles.statLabel}>Pekerjaan Selesai</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{worker.responseTime}</Text>
+            <Text style={styles.statValue}>{worker.response_time}</Text>
             <Text style={styles.statLabel}>Respon</Text>
           </View>
         </View>
@@ -182,21 +165,21 @@ export default function WorkerDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Galeri Pekerjaan</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.gallery}>
-            {worker.gallery.map((image, index) => (
-              <Image key={index} source={{ uri: image }} style={styles.galleryImage} />
-            ))}
+            {worker.gallery.map((image) => (
+              <Image key={image.id} source={{ uri: image.image_url }} style={styles.galleryImage} />
+            ))}  
           </ScrollView>
         </View>
 
         {/* Reviews */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Ulasan Pelanggan</Text>
-          {worker.reviews.map((review, index) => (
-            <View key={index} style={styles.reviewCard}>
+          {worker.reviews.map((review) => (
+            <View key={review.id} style={styles.reviewCard}>
               <View style={styles.reviewHeader}>
-                <Image source={{ uri: review.avatar }} style={styles.reviewAvatar} />
+                <Image source={{ uri: review.user.avatar || 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&dpr=2' }} style={styles.reviewAvatar} />
                 <View style={styles.reviewInfo}>
-                  <Text style={styles.reviewName}>{review.name}</Text>
+                  <Text style={styles.reviewName}>{review.user.name}</Text>
                   <View style={styles.reviewRating}>
                     {[1, 2, 3, 4, 5].map((star) => (
                       <Star
@@ -208,7 +191,7 @@ export default function WorkerDetailScreen() {
                     ))}
                   </View>
                 </View>
-                <Text style={styles.reviewDate}>{review.date}</Text>
+                <Text style={styles.reviewDate}>{new Date(review.created_at).toLocaleDateString('id-ID')}</Text>
               </View>
               <Text style={styles.reviewComment}>{review.comment}</Text>
             </View>
